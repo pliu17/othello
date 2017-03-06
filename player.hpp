@@ -4,9 +4,16 @@
 #include <iostream>
 #include "common.hpp"
 #include "board.hpp"
+#include <ctime>
+
 using namespace std;
 
 class Player {
+
+private:
+	Board playBoard;
+	Side mySide;
+	Side otherSide;   // keep this for efficiency
 
 public:
     Player(Side side);

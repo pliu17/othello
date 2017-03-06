@@ -40,5 +40,27 @@ Move *Player::doMove(Move *opponentsMove, int msLeft) {
      * TODO: Implement how moves your AI should play here. You should first
      * process the opponent's opponents move before calculating your own move
      */
+    clock_t beginTime= clock();
+
+    // first we check whether the opponentsMove is not nullptr and then we need to check
+    if (opponentsMove != nullptr)
+    {
+        // then check if it is legal
+        if (!playBoard.checkMove(opponentsMove, otherSide))
+        {
+            cerr << "Side " << (otherSize==WHITE ? "WHITE": "BLACK") << " are making an illegal move" << endl;
+        }
+
+        else  // Modifies the board to reflect the specified move.
+        {
+            playBoard.doMove(opponentsMove, otherSide);
+        }
+    }
+
+
+    // now we check every legal move
+    if (!playBoard.hasMoves(mySide))
+        return nullptr;
+
     return nullptr;
 }
