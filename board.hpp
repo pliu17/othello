@@ -47,9 +47,16 @@ public:
     // a helper function to calculate a simple position score
     int calcSimpleScore(Side side);
     // a helper function to calculate a position-weighted heuristic score
-    int calcHeuristicScore(Side side);
-    int heuristicScore(Side side);
+    int calcHeuristicScore(Side side, Move &testMove);
 
+    // a helper function to find the best legal move with from all legal moves supporting heuristic and minimax decision tree
+    Move *getBestNextMove(Side side);
+
+    // a helper function to find the best legal move with from all legal moves using minimax decision tree
+    Move *getMiniMaxMove(Side side, int lookAheadLevel=2);
+
+    // a helper function to calculate a mini score
+    int calcMiniScore(Side mySide, Side testSide, Move &testMove, int lookAheadLevel, int currLevel);
 
 };
 

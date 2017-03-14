@@ -219,9 +219,9 @@ int Board::getBestMoveId(Side side, vector<int>& legalMoveIdVec)
         int y = moveId/8;
         Move nextMove(x, y);
         nextBoard->doMove(&nextMove, side);
-        int score = nextBoard->calcSimpleScore(side);
-        //int score = nextBoard->calcHeuristicScore(side);
-        //if (score != score0) 
+        //int score = nextBoard->calcSimpleScore(side);
+        int score = nextBoard->calcHeuristicScore(side, nextMove);
+        //if (score != score0)
         //    cerr << "Something fishy: (score0, score)=(" << score0 << "," << score << ")" << endl;
         if (score > bestScore)
         {
@@ -251,70 +251,180 @@ int Board::calcSimpleScore(Side side)
  * Helper function: to get the current score using a heuristic scheme (position-weighted):
  *                  score = (# stones the given side has) - (# stones the opponent side has)
  */
-int Board::calcHeuristicScore(Side side)
+int Board::calcHeuristicScore(Side side, Move &testMove)
 {
-    return side==BLACK ? heuristicScore(BLACK)-heuristicScore(WHITE) : heuristicScore(WHITE)-heuristicScore(BLACK);
+    int x = testMove.x;
+    int y = testMove.y;
+    int multiplier = 1;
+    if ( (x==0 || x==7) && (y==0 || y==7) )  // corners
+        multiplier = 3;
+    else if ( (x<=1 || x >=6) && (y<=1 || y >= 6))  // corner-adjacent squares + corners
+        multiplier = -3;
+
+    return side==BLACK ? multiplier*countBlack()-countWhite() : multiplier*countWhite()-countBlack();
+    //return multiplier*calcSimpleScore(side);
+}
+
+
+
+/*
+ * Helper function: to find the best legal move with from all legal moves
+ *  1. Calculate all legal moves to be considered
+ *  2. Based on a score scheme to calculate a score for each legal move, find the move id with the best (max) score.
+ *  3. return the move with the best score as the next move
+ *
+ * This function will return nullptr if no legal move can be found
+ */
+Move *Board::getBestNextMove(Side side)
+{
+    vector<int> legalMoveIdVec = getLegalMoveIds(side);
+    if (legalMoveIdVec.size() < 1)  // no legal move to explore
+        return nullptr;
+
+    // string legalMovesString("[");
+    // string scoresString("]");
+    // ostringstream legalMovesSS;
+    // ostringstream scoresSS;
+    // legalMovesSS << "[";
+    // scoresSS << "[";
+    int bestScore = INT_MIN;
+    int bestId = -1;
+    for (int moveId: legalMoveIdVec)
+    {
+        // copy the current board to a simulated board for a test move
+        Board *testBoard = copy();
+
+        Move testMove(moveId%8, moveId/8);
+        testBoard->doMove(&testMove, side);
+        //int score = testBoard->calcSimpleScore(side);
+        int score = testBoard->calcHeuristicScore(side, testMove);
+        // legalMovesSS << "(" << testMove.x << "," << testMove.y << "),";
+        // scoresSS << score << "," ;
+
+        if (score > bestScore)
+        {
+            bestScore = score;
+            bestId = moveId;
+        }
+
+        delete testBoard;  // clean up the simulated board
+    }
+    // legalMovesString += "]";
+    // scoresString += "]";
+    // legalMovesSS << "]";
+    // scoresSS << "]";
+
+    // cerr << "getBestNextMove(): legalMoves=" + legalMovesSS.str() << endl;
+    // cerr << "getBestNextMove(): scores=" + scoresSS.str() << endl;
+
+    if (bestId < 0)
+    {
+        cerr << "getBestNextMove(): fishy score calculation: no score exists for all legal moves of size="
+            << legalMoveIdVec.size() << endl;
+        return nullptr;
+    }
+
+    Move *nextMove = new Move(bestId%8, bestId/8);
+
+    return nextMove;
 }
 
 
 /*
- * Helper function: a heuristic scheme (position-weighted):
- *                  score = (# position scores the given side has) - (# position scores the opponent side has)
- *                  corner scores are emphasized by a multiplier of 3
- *                  corner-adjacent scores are de-emphasized by a multiplier of 3
+ * Helper function: to find the best legal move with from all legal moves
+ *  1. Calculate all legal moves to be considered
+ *  2. Based on the minimax decision tree to find the move id with the best (max) score.
+ *  3. return the move with the best score as the next move
+ *
+ * This function will return nullptr if no legal move can be found
  */
-
-int Board::heuristicScore(Side side)
+Move *Board::getMiniMaxMove(Side side, int lookAheadLevel)
 {
-    int multiplier = 1;
-    int total = count(side);
+    vector<int> legalMoveIdVec = getLegalMoveIds(side);
+    if (legalMoveIdVec.size() < 1)  // no legal move to explore
+        return nullptr;
 
-    // // emphasize corners
-    // vector<Move> cornerVec = { Move(0, 0), Move(7, 0), Move(0, 7), Move(7, 7) };
-    // for (Move &c: cornerVec)
-    // {
-    //     int X = c.getX();
-    //     int Y = c.getY();
-    //     for (int dx = -1; dx <= 1; ++dx)
-    //     {
-    //         for (int dy = -1; dy <= 1; ++dy)
-    //         {
-    //             int x = X + dx;
-    //             int y = Y + dy;
-    //             if (x < 0 || x > 7 || y < 0 || y > y)
-    //                 continue;
-    //             if (dx == 0 && dy == 0)  // corners
-    //                 total += extraWeight * get(side, x, y);  //  emphasize corners
-    //             else
-    //                 total -= extraWeight * get(side, x, y);  // de-emphasize squares adjacent to corners
-    //         }
-    //     }
-    // }
+    // string legalMovesString("[");
+    // string scoresString("]");
+    // ostringstream legalMovesSS;
+    // ostringstream scoresSS;
+    // legalMovesSS << "[";
+    // scoresSS << "[";
+    int bestScore = INT_MIN;
+    int bestId = -1;
+    for (int moveId: legalMoveIdVec)
+    {
+        // copy the current board to a simulated board for a test move
+        Board *testBoard = copy();
 
-    // emphasize corners
-    // (0, 0), (7, 0), (0, 7), (7, 7)
-    total += (multiplier-1) * get(side, 0, 0);
-    total += (multiplier-1) * get(side, 7, 0);
-    total += (multiplier-1) * get(side, 0, 7);
-    total += (multiplier-1) * get(side, 7, 7);
+        Move testMove(moveId%8, moveId/8);
+        testBoard->doMove(&testMove, side);
+        //int score = testBoard->calcSimpleScore(side);
+        int score;
+        score = testBoard->calcMiniScore(side, side==BLACK? WHITE: BLACK, testMove, lookAheadLevel, 1);
 
-    // de-emphasize squares adjacent to corners
-    // (1,0), (0, 1), (1, 1); (6, 0), (7, 1), (6, 1); (1, 7), (0, 6), (1, 6); (6, 7), (7, 6), (6, 6)
-    total -= (multiplier+1) * get(side, 1, 0);
-    total -= (multiplier+1) * get(side, 0, 1);
-    total -= (multiplier+1) * get(side, 1, 1);
 
-    total -= (multiplier+1) * get(side, 6, 0);
-    total -= (multiplier+1) * get(side, 7, 1);
-    total -= (multiplier+1) * get(side, 6, 1);
+        // legalMovesSS << "(" << testMove.x << "," << testMove.y << "),";
+        // scoresSS << score << "," ;
 
-    total -= (multiplier+1) * get(side, 1, 7);
-    total -= (multiplier+1) * get(side, 0, 6);
-    total -= (multiplier+1) * get(side, 1, 6);
+        if (score > bestScore)
+        {
+            bestScore = score;
+            bestId = moveId;
+        }
 
-    total -= (multiplier+1) * get(side, 6, 7);
-    total -= (multiplier+1) * get(side, 7, 6);
-    total -= (multiplier+1) * get(side, 6, 6);
+        delete testBoard;  // clean up the simulated board
+    }
+    // legalMovesString += "]";
+    // scoresString += "]";
+    // legalMovesSS << "]";
+    // scoresSS << "]";
 
-    return total;
+    // cerr << "getMiniMaxMove(): legalMoves=" + legalMovesSS.str() << endl;
+    // cerr << "getMiniMaxMove(): scores=" + scoresSS.str() << endl;
+
+    if (bestId < 0)
+    {
+        cerr << "getBestNextMove(): fishy score calculation: no score exists for all legal moves of size="
+            << legalMoveIdVec.size() << endl;
+        return nullptr;
+    }
+
+    Move *nextMove = new Move(bestId%8, bestId/8);
+
+    return nextMove;
+}
+
+int Board::calcMiniScore(Side mySide, Side testSide, Move &testMove, int lookAheadLevel, int currLevel)
+{
+    // Base case 1: when lookAheadLevel is reached, just return the heuristic score
+    if (currLevel >= lookAheadLevel)
+        return calcSimpleScore(mySide); // calcHeuristicScore(mySide, testMove);   // score is calculated for mySide
+
+    // Base case 2: or when no more legal move available; just return INT_MAX as a token for a terminal path
+    vector<int> legalMoveIdVec = getLegalMoveIds(testSide);
+    if (legalMoveIdVec.size() < 1)  // no legal move to explore
+        return INT_MAX;  // use the INT_MAX to mean a disconnected path
+
+
+    int worstScore = INT_MAX;
+    // int worstId = -1;
+
+    for (int moveId: legalMoveIdVec)
+    {
+        // copy the current board to a simulated board for a test move
+        Board *testBoard = copy();
+
+        Move testMove(moveId%8, moveId/8);
+        testBoard->doMove(&testMove, testSide);   // move is determined by testSide
+        int score = testBoard->calcMiniScore(mySide, testSide==BLACK?WHITE:BLACK, testMove, lookAheadLevel, currLevel+1);   // score is calculated for mySide
+        if (score < worstScore)
+        {
+            worstScore = score;
+            // worstId = moveId;
+        }
+        delete testBoard;  // clean up the simulated board
+    }
+
+    return worstScore;
 }

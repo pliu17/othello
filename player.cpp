@@ -61,21 +61,22 @@ Move *Player::doMove(Move *opponentsMove, int msLeft) {
     playBoard.doMove(opponentsMove, otherSide);
 
 
-    // now we check every legal move
-    vector<int> legalMoveIdVec = playBoard.getLegalMoveIds(mySide);
-    if (legalMoveIdVec.size() == 0) // no legal move
-        return nullptr;
-    // for (int id : legalMoveIdVec)
-    // {
-    //     cerr << "(x,y)=(" << id%8 << "," << id/8 << ")" << endl;
-    // }
+    // // now we check every legal move
+    // vector<int> legalMoveIdVec = playBoard.getLegalMoveIds(mySide);
+    // if (legalMoveIdVec.size() == 0) // no legal move
+    //     return nullptr;
+    // // for (int id : legalMoveIdVec)
+    // // {
+    // //     cerr << "(x,y)=(" << id%8 << "," << id/8 << ")" << endl;
+    // // }
 
-    // now we check some legal move
-    // int id = legalMoveIdVec[0];
-    int id = playBoard.getBestMoveId(mySide, legalMoveIdVec);
+    // // now we check some legal move
+    // // int id = legalMoveIdVec[0];
+    // int id = playBoard.getBestMoveId(mySide, legalMoveIdVec);
 
 
-    Move *myMove = new Move(id%8, id/8);
+    // Move *myMove = new Move(id%8, id/8);
+    Move *myMove = playBoard.getBestNextMove(mySide);
 
     double elapsed_msec = double(clock() - beginTime)/CLOCKS_PER_SEC * 1000;
     if (msLeft > -1 && msLeft < elapsed_msec)
