@@ -76,7 +76,16 @@ Move *Player::doMove(Move *opponentsMove, int msLeft) {
 
 
     // Move *myMove = new Move(id%8, id/8);
-    Move *myMove = playBoard.getBestNextMove(mySide);
+
+    // // One-ply decision (greedy)
+    // Move *myMove = playBoard.getBestNextMove(mySide);
+
+    // Two-ply decision tree
+    Move *myMove = playBoard.getMiniMaxMove(mySide);
+
+    // // N-ply decision tree
+    // int lookAheadLevel = 1;
+    // Move *myMove = playBoard.getMiniMaxMove(mySide, lookAheadLevel);
 
     double elapsed_msec = double(clock() - beginTime)/CLOCKS_PER_SEC * 1000;
     if (msLeft > -1 && msLeft < elapsed_msec)

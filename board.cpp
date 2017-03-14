@@ -265,10 +265,34 @@ int Board::calcHeuristicScore(Side side, Move &testMove)
     //return multiplier*calcSimpleScore(side);
 }
 
+/*
+ * Helper function: to get the current score using a heuristic scheme (position-weighted):
+ *                  multiplier1 = 1 or multiplier if testSide=="given side";  multiplier2 = 1 or multiplier if testSide==opponent side 
+ *                  score = multiplier1 * (# stones the given side has) - multiplier2 * (# stones the opponent side has)
+ */
+int Board::calcHeuristicScore4MinMax(Side side, Side testSide, Move &testMove)
+{
+    int x = testMove.x;
+    int y = testMove.y;
+    int multiplier = 1;
+    if ( (x==0 || x==7) && (y==0 || y==7) )  // corners
+        multiplier = 3;
+    else if ( (x<=1 || x >=6) && (y<=1 || y >= 6))  // corner-adjacent squares + corners
+        multiplier = -3;
+
+    // testSide determines which count will be updated by the multiplier.
+    int blackCount = testSide==BLACK ? multiplier*countBlack() : countBlack();
+    int whiteCount = testSide==WHITE ? multiplier*countWhite() : countWhite();
+
+    // side determines the order of difference: namely either countBlack()-countWhite() or countWhite()-countBlack()
+    return side==BLACK ? blackCount-whiteCount : whiteCount-blackCount;
+    //return multiplier*calcSimpleScore(side);
+
+}
 
 
 /*
- * Helper function: to find the best legal move with from all legal moves
+ * Helper function: to find the best legal move with from all legal moves (1-ply calculation)
  *  1. Calculate all legal moves to be considered
  *  2. Based on a score scheme to calculate a score for each legal move, find the move id with the best (max) score.
  *  3. return the move with the best score as the next move
@@ -331,14 +355,14 @@ Move *Board::getBestNextMove(Side side)
 
 
 /*
- * Helper function: to find the best legal move with from all legal moves
+ * Helper function: to find the best legal move with from all legal moves (2-ply calculation)
  *  1. Calculate all legal moves to be considered
  *  2. Based on the minimax decision tree to find the move id with the best (max) score.
  *  3. return the move with the best score as the next move
  *
  * This function will return nullptr if no legal move can be found
  */
-Move *Board::getMiniMaxMove(Side side, int lookAheadLevel)
+Move *Board::getMiniMaxMove(Side side)
 {
     vector<int> legalMoveIdVec = getLegalMoveIds(side);
     if (legalMoveIdVec.size() < 1)  // no legal move to explore
@@ -352,6 +376,7 @@ Move *Board::getMiniMaxMove(Side side, int lookAheadLevel)
     // scoresSS << "[";
     int bestScore = INT_MIN;
     int bestId = -1;
+    // for each possible first-ply move
     for (int moveId: legalMoveIdVec)
     {
         // copy the current board to a simulated board for a test move
@@ -361,7 +386,8 @@ Move *Board::getMiniMaxMove(Side side, int lookAheadLevel)
         testBoard->doMove(&testMove, side);
         //int score = testBoard->calcSimpleScore(side);
         int score;
-        score = testBoard->calcMiniScore(side, side==BLACK? WHITE: BLACK, testMove, lookAheadLevel, 1);
+        // calculating the second-ply scores
+        score = testBoard->calcMinScore(side, side==BLACK ? WHITE: BLACK);
 
 
         // legalMovesSS << "(" << testMove.x << "," << testMove.y << "),";
@@ -395,13 +421,9 @@ Move *Board::getMiniMaxMove(Side side, int lookAheadLevel)
     return nextMove;
 }
 
-int Board::calcMiniScore(Side mySide, Side testSide, Move &testMove, int lookAheadLevel, int currLevel)
+// Just for second-ply calculations
+int Board::calcMinScore(Side mySide, Side testSide)
 {
-    // Base case 1: when lookAheadLevel is reached, just return the heuristic score
-    if (currLevel >= lookAheadLevel)
-        return calcSimpleScore(mySide); // calcHeuristicScore(mySide, testMove);   // score is calculated for mySide
-
-    // Base case 2: or when no more legal move available; just return INT_MAX as a token for a terminal path
     vector<int> legalMoveIdVec = getLegalMoveIds(testSide);
     if (legalMoveIdVec.size() < 1)  // no legal move to explore
         return INT_MAX;  // use the INT_MAX to mean a disconnected path
@@ -409,6 +431,8 @@ int Board::calcMiniScore(Side mySide, Side testSide, Move &testMove, int lookAhe
 
     int worstScore = INT_MAX;
     // int worstId = -1;
+    // set to false to use "simpleheuristic" (ie. difference) to agree with the testminimax result.
+    bool useHeuristic = true;
 
     for (int moveId: legalMoveIdVec)
     {
@@ -417,7 +441,8 @@ int Board::calcMiniScore(Side mySide, Side testSide, Move &testMove, int lookAhe
 
         Move testMove(moveId%8, moveId/8);
         testBoard->doMove(&testMove, testSide);   // move is determined by testSide
-        int score = testBoard->calcMiniScore(mySide, testSide==BLACK?WHITE:BLACK, testMove, lookAheadLevel, currLevel+1);   // score is calculated for mySide
+        // int score = testBoard->calcMiniScore(mySide, testSide==BLACK?WHITE:BLACK, testMove, lookAheadLevel, currLevel+1);   // score is calculated for mySide
+        int score = useHeuristic? testBoard->calcHeuristicScore4MinMax(mySide, testSide, testMove) : testBoard->calcSimpleScore(mySide); // score is calculated for mySide
         if (score < worstScore)
         {
             worstScore = score;
@@ -428,3 +453,121 @@ int Board::calcMiniScore(Side mySide, Side testSide, Move &testMove, int lookAhe
 
     return worstScore;
 }
+
+
+
+/*
+ * Helper function: a recursive algorithm to find the best legal move with from all legal moves (n-ply)
+ *  1. Calculate all legal moves to be considered
+ *  2. Based on the minimax decision tree to find the move id with the best (max) score.
+ *  3. return the move with the best score as the next move
+ *
+ * This function will return nullptr if no legal move can be found
+ */
+Move *Board::getMiniMaxMove(Side mySide, int lookAheadLevel)
+{
+    vector<int> legalMoveIdVec = getLegalMoveIds(mySide);
+    if (legalMoveIdVec.size() < 1)  // no legal move to explore
+        return nullptr;
+
+    // string legalMovesString("[");
+    // string scoresString("]");
+    // ostringstream legalMovesSS;
+    // ostringstream scoresSS;
+    // legalMovesSS << "[";
+    // scoresSS << "[";
+    int bestScore = INT_MIN;
+    int bestId = -1;
+    for (int moveId: legalMoveIdVec)
+    {
+        // copy the current board to a simulated board for a test move
+        Board *testBoard = copy();
+
+        Move testMove(moveId%8, moveId/8);
+        testBoard->doMove(&testMove, mySide);
+        //int score = testBoard->calcSimpleScore(side);
+        // MAJOR difference between 2-ply vs n-ply calculations !! 
+        int score = testBoard->calcMiniMaxScore(mySide, mySide==BLACK ? WHITE: BLACK, testMove, lookAheadLevel, 1);
+
+        // legalMovesSS << "(" << testMove.x << "," << testMove.y << "),";
+        // scoresSS << score << "," ;
+
+        if (score > bestScore)
+        {
+            bestScore = score;
+            bestId = moveId;
+        }
+
+        delete testBoard;  // clean up the simulated board
+    }
+    // legalMovesString += "]";
+    // scoresString += "]";
+    // legalMovesSS << "]";
+    // scoresSS << "]";
+
+    // cerr << "getMiniMaxMove(): legalMoves=" + legalMovesSS.str() << endl;
+    // cerr << "getMiniMaxMove(): scores=" + scoresSS.str() << endl;
+
+    if (bestId < 0)
+    {
+        cerr << "getBestNextMove(): fishy score calculation: no score exists for all legal moves of size="
+            << legalMoveIdVec.size() << endl;
+        return nullptr;
+    }
+
+    Move *nextMove = new Move(bestId%8, bestId/8);
+
+    return nextMove;
+}
+
+
+int Board::calcMiniMaxScore(Side mySide, Side testSide, Move &testMove, int lookAheadLevel, int currLevel)
+{
+    // Base case 1: when lookAheadLevel is reached, just return the heuristic(or simple) score
+    if (currLevel >= lookAheadLevel)
+        return calcHeuristicScore4MinMax(mySide, testSide, testMove);  // calcSimpleScore(mySide);    // score is calculated for mySide
+
+    // Base case 2: or when no more legal move available; just return INT_MAX as a token for a terminal path
+    // a. if testSide == mySide; then it is a max level (as we want to find the best score for ourselves)
+    // b. if testSide != mySide; then it is a min level (as we want to find the worst score for ourselves)
+
+    bool isMinLevel = (testSide != mySide);
+    vector<int> legalMoveIdVec = getLegalMoveIds(testSide);
+    if (legalMoveIdVec.size() < 1)  // no legal move to explore
+        return isMinLevel? INT_MAX : INT_MIN;  // use the INT_MAX to mean a disconnected path
+
+    int minScore = INT_MAX;
+    //int minId = -1;
+    int maxScore = INT_MIN;
+    //int maxId = -1;
+
+    for (int moveId: legalMoveIdVec)
+    {
+        // copy the current board to a simulated board for a test move
+        Board *testBoard = copy();
+
+        Move testMove(moveId%8, moveId/8);
+        testBoard->doMove(&testMove, testSide);   // move is determined by testSide
+        int score = testBoard->calcMiniMaxScore(mySide, testSide==BLACK?WHITE:BLACK, testMove, lookAheadLevel, currLevel+1);   // score is calculated for mySide
+        if (isMinLevel)
+        {
+            if (score < minScore)
+            {
+                minScore = score;
+                // minId = moveId;
+            }
+        }
+        else
+        {
+            if (score > maxScore)
+            {
+                maxScore = score;
+                // maxId = moveId;
+            }
+        }
+        delete testBoard;  // clean up the simulated board
+    }
+
+    return isMinLevel? minScore : maxScore;
+}
+

@@ -48,15 +48,18 @@ public:
     int calcSimpleScore(Side side);
     // a helper function to calculate a position-weighted heuristic score
     int calcHeuristicScore(Side side, Move &testMove);
-
+    // a helper function to calculate a position-weighted heuristic score for the MiniMax tree
+    int calcHeuristicScore4MinMax(Side side, Side testSide, Move &testMove);
     // a helper function to find the best legal move with from all legal moves supporting heuristic and minimax decision tree
     Move *getBestNextMove(Side side);
-
-    // a helper function to find the best legal move with from all legal moves using minimax decision tree
-    Move *getMiniMaxMove(Side side, int lookAheadLevel=2);
-
-    // a helper function to calculate a mini score
-    int calcMiniScore(Side mySide, Side testSide, Move &testMove, int lookAheadLevel, int currLevel);
+    // a helper function to find the best legal move with from all legal moves using 2-ply minimax decision tree
+    Move *getMiniMaxMove(Side side);
+    // a helper function to calculate a mini score (used for the second-ply calculations)
+    int calcMinScore(Side mySide, Side testSide);
+    // a helper function to find the best legal move with from all legal moves using n-ply minimax decision tree
+    Move *getMiniMaxMove(Side mySide, int lookAheadLevel);
+    // a helper function to calculate a min/max score for multiple-ply
+    int calcMiniMaxScore(Side mySide, Side testSide, Move &testMove, int lookAheadLevel, int currLevel);
 
 };
 
